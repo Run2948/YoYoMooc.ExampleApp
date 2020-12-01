@@ -1,6 +1,6 @@
-### 创建`RazorPage`项目
+### 1.通过`.NET Core CLI`创建`RazorPage`程序
 
-```shell
+```bash
 mkdir YoYoMooc.ExampleApp
 dotnet new razor --language C# --auth None --framework netcoreapp3.1
 ```
@@ -127,3 +127,74 @@ new Product { Name = "产品4", Category = "分类2", Price = 100 },
      services.AddRazorPages();
  }
 ```
+
+### 2.创建一个自定义`ASP.NET Core RazorPage Docker`镜像
+
+提示：`从ASP.NET Core 3.x 开始，微软镜像就不再由 hub.docker.com 托管。而是由微软官方进行独立维护，所以镜像域名地址为mcr.microsoft.com`
+
+```dockerfile
+FROM mcr.microsoft.com/dotnet/core/aspnet:3.1
+# 复制应用程序文件
+COPY dist /app
+# 设置工作目录
+WORKDIR /app
+# 公开HTTP端口
+EXPOSE 80/tcp
+# 运行应用程序
+ENTRYPOINT ["dotnet","Example.dll"]
+```
+
+- 复制应用程序文件
+
+当您将`ASP.NET Core`应用程序容器化时，所有已编译的类文件，`NuGet`包，配置文件，并将Razor视图添加到镜像中。 COPY命令复制文件或文件夹放入容器。
+
+```bash
+COPY dist /app
+```
+
+此命令是将`dist`的文件夹中的文件复制到容器`/app`的文件夹中。 目前dist文件夹不存在，我们会在后面准备它。
+
+- 设置工作目录
+
+`WORKDIR`命令便是设置容器的工作目录，这是在运行时非常有用命令，当你需要指定某个路径或者文件的时，不必指定完整路径。 `Dockerfile`文件中的命令会将COPY 命令创建的`/app`文件夹的路径，包含到容器的应用程序中。
+
+- 公开HTTP端口
+
+容器中的进程无需任何特殊措施即可打开网络端口，但Docker不允许外部世界访问它们，除非`Dockerfile`包含一个指定端口的`EXPOSE`命令，如下所示：
+
+```bash
+EXPOSE 80/tcp
+```
+
+这个命令告诉Docker，它可以使容器外的TCP请求可用端口80。 对我们的示例应用程序，也需要这样做，这样`ASP.NET Core Kestrel`服务器才能接收到HTTP请求。
+
+> 提示:在容器中处理端口是一个两步走的过程。在后面 "使用容器的工作 "部分，了解更多关于 关于如何完成配置，使服务器能够接收请求的详细信息。
+
+- 运行应用程序
+
+Docker文件的最后一步是`ENTRYPOINT`命令，它告诉Docker此为容器的起点。
+
+```bash
+ENTRYPOINT ["dotnet", "YoYoMooc.ExampleApp.dll"]
+```
+
+该命令告诉Docker运行`dotnet cli`命令行工具来执行`YoYoMooc.ExampleApp`文件，我将在下一节中创建。 不必指定`YoYoMooc.ExampleApp`文件的路径,因为它假定位于`WORKDIR`命令指定的目录中，而目录将包含所有的应用程序文件。
+
+- 预备的应用程序镜像
+
+  我们知道只有 `registory.cn-hangzhou.aliyuncs.com/yoyosoft/dotnet/core/sdk`才能运行`dotnet cli`命令。
+
+输入以下命令：
+
+```bash
+dotnet publish --framework netcoreapp3.1 --configuration Release --output dist
+```
+
+ `dotnet publish`命令可以编译应用程序，然后将其转换为转换成一个独立的文件集，其中包含了应用程序所需的所有内容。输出参数指定了编译后的项目应该被写到一个名为 `dist` 的文件夹中，这个文件夹对应`Dockerfile`中的 `COPY`命令。
+
+* 创建一个自定义镜像
+
+```bash
+docker build . -t yoyomooc/exampleapp -f Dockerfile
+```
+
