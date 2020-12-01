@@ -244,3 +244,51 @@ docker run -p 5000:80 --name exampleApp5000 yoyomooc/exampleapp
 docker run -p 6000:80 --rm --name exampleApp6000 yoyomooc/exampleapp
 ```
 
+### 4.复制文件到正在运行的Docker容器中
+
+为了便于演示效果，我们会通过运行两个容器来做对比，分别是映射到端口3000和4000。
+
+* 运行我们之前创建的两个容器
+
+```bash
+docker start exampleApp3000 exampleApp4000
+```
+
+* 在样式文件中添加以下代码 (`site.css`)
+
+```css
+.text-white {
+  color:red !important;
+}
+
+.bg-success {
+  background-color: rgb(71, 71, 71) !important;
+} 
+```
+
+* 项目根目录中执行以下命令
+
+```bash
+docker cp wwwroot/css/site.css exampleApp4000:/app/wwwroot/css/site.css
+```
+
+* 先尝试直接查看效果，然后输入以下命令再次查看效果（清除文件缓存的影响）
+
+```bash
+docker stop exampleApp4000
+docker start exampleApp4000
+```
+
+* 检查对容器的修改
+
+```bash
+docker diff exampleApp4000
+```
+
+结果中的每个列，都有一个字母表示变化的类型，请查看以下注释说明：
+
+- **A** 表示已将一个文件或文件夹添加到容器中。
+- **C** 表示文件或文件夹已被修改。如果是文件夹，表示该文件夹内的文件已被添加或删除。
+- **D** 表示文件或文件夹已从容器中删除。
+
+我们可以看到除了`site.css`发生了变化，还创建了一些文件，这些文件均是和调试有关的内容。
