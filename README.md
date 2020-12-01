@@ -198,3 +198,49 @@ dotnet publish --framework netcoreapp3.1 --configuration Release --output dist
 docker build . -t yoyomooc/exampleapp -f Dockerfile
 ```
 
+### 3.`Docker`镜像创建容器的几种方法
+
+* 创建容器
+
+```c#
+docker create -p 3000:80 --name exampleApp3000 yoyomooc/exampleapp
+```
+
+* 启动所有容器
+
+```bash
+docker start exampleApp3000
+
+docker start $(docker ps -aq)
+```
+
+* 停止所有正在运行的容器
+
+```bash
+docker stop exampleApp3000
+
+docker stop $(docker ps -q)
+```
+
+* 获取容器输出日志
+
+```bash
+显示容器的最新输出(即使是容器已被停止)
+docker start exampleApp3000
+
+使用 -f 参数来监控输出
+docker logs -f exampleApp3000
+```
+
+* 命令创建和启动容器
+
+```bash
+docker run -p 5000:80 --name exampleApp5000 yoyomooc/exampleapp
+```
+
+* 自动删除容器(当容器停止时自动删除)
+
+```bash
+docker run -p 6000:80 --rm --name exampleApp6000 yoyomooc/exampleapp
+```
+
