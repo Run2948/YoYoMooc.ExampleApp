@@ -421,3 +421,76 @@ docker run --name vtest apress/vtest
 
   Docker 会删除容器，同时 `/data/message.txt` 文件也会被删除。 所以容器删除后，数据文件也就丢失了。而在实际生产环境中，删除数据文件会造成严重的后果，所以需要避免。
 
+### 10. 如何使用Docker Volume管理机密数据
+
+* 更新Dockerfile文件
+
+  现在我们需要更新我们的Dockerfile文件，让它支持数据卷，以下是更新后的代码：
+
+```dockerfile
+FROM alpine:3.9
+
+VOLUME /data
+
+WORKDIR /data
+
+ENTRYPOINT (test -e message.txt && echo "文件已存在" \
+    || (echo "创建文件中..." \
+    && echo 你好, Docker 时间: $(date '+%X') > message.txt)) && cat message.txt
+
+```
+
+* 重新创建镜像文件
+
+```bash
+docker build . -t yoyomooc/vtest -f Dockerfile.volumes
+```
+
+* 创建一个卷
+
+```bash
+docker volume create --name testdata
+```
+
+* 创建容器
+
+```bash
+// 参数 -v 会告诉docker，将容器内部/data目录中创建的任何数据均保存到卷testdata中
+docker run --name vtest2 -v testdata:/data yoyomooc/vtest
+```
+
+* 输出结果如下
+
+```bash
+创建文件中...
+你好, Docker 时间: 06:25:41
+```
+
+* 尝试删除现有的容器，并创建和运行一个新容器替换现在的
+
+```bash
+docker rm -f vtest2
+docker run --name vtest2 -v testdata:/data yoyomooc/vtest
+```
+
+* 输出的结果如下
+
+```bash
+文件已存在
+你好, Docker 时间: 06:25:41
+```
+
+* 查看一个镜像是否使用了卷
+
+```bash
+docker inspect yoyomooc/vtest
+```
+
+* 查看是否包括以下内容：
+
+```bash
+ "Volumes": {
+    "/data": {}
+ },
+```
+
