@@ -322,3 +322,41 @@ vim /app/wwwroot/css/site.css
 docker commit exampleApp4000 yoyomooc/exampleapp:changed
 ```
 
+### 6. 发布Docker镜像到`Dockhub`容器仓库
+
+**注意: ** 请自行前往`https://hub.docker.com/`注册自己的账户，为了对比方便，我们再制作一个未修改的镜像一共发布到Docker仓库中。
+
+* 为需要发布的项目打上标记
+
+```bash
+docker tag yoyomooc/exampleapp:change kindyroo/exampleapp:change
+docker tag yoyomooc/exampleapp:latest kindyroo/exampleapp:unchange
+```
+
+* 现在打开终端控制台，输入以下命令
+
+```bash
+docker login -u <用户名> -p <密码>
+```
+
+登录成功会返回 `Login Succeeded` 消息
+
+* 推送镜像到仓库
+
+```bash
+docker push kindyroo/exampleapp:changed
+docker push kindyroo/exampleapp:unchange
+```
+
+* 登录`https://hub.docker.com/repository/docker/kindyroo/exampleapp`地址进行验证
+
+* 注销 docker 登录的用户
+
+```bash
+docker logout
+```
+
+### 7. [发布Docker镜像到阿里云容器仓库](https://www.yoyomooc.com/yoyomooc/11-Publish-the-image-to--Aliyun-Docker)
+
+### 8. [发布Docker镜像到Azure容器仓库](https://www.yoyomooc.com/yoyomooc/12-Publish-the-image-to--Azure-Docker)
+
