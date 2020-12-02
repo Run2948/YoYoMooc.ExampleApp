@@ -292,3 +292,33 @@ docker diff exampleApp4000
 - **D** 表示文件或文件夹已从容器中删除。
 
 我们可以看到除了`site.css`发生了变化，还创建了一些文件，这些文件均是和调试有关的内容。
+
+### 5. 将正在运行的容器保存为本地Docker镜像
+
+* 直接与容器进行交互，进入容器内部查看文件
+
+```bash
+docker exec exampleApp4000 cat /app/wwwroot/css/site.css 
+```
+
+- 进入容器内部，通过操作 css 样式文件来验证
+
+```bash
+// -it 参数是告诉 Docker 这是一个交互式命令,这需要终端支持
+docker exec -it exampleApp4000 /bin/bash
+// 这一步可能因为网络的问题，导致无法正常的安装VIM工具，可以选择跳过
+apt-get update
+apt-get install vim
+// 进入Site.css文件中，然后执行i键，然后就可以正常的编辑代码了
+vim /app/wwwroot/css/site.css
+```
+
+然后保存修改后的文件，刷新浏览器就可以看到修改后的结果。
+
+* 将修改后的容器创建为镜像
+
+```bash
+// 这个命令会创建一个新的 yoyomooc/exampleapp 镜像的变体，标记为change
+docker commit exampleApp4000 yoyomooc/exampleapp:changed
+```
+
