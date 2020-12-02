@@ -339,7 +339,7 @@ docker tag yoyomooc/exampleapp:latest kindyroo/exampleapp:unchange
 docker login -u <用户名> -p <密码>
 ```
 
-登录成功会返回 `Login Succeeded` 消息
+​		登录成功会返回 `Login Succeeded` 消息
 
 * 推送镜像到仓库
 
@@ -359,4 +359,65 @@ docker logout
 ### 7. [发布Docker镜像到阿里云容器仓库](https://www.yoyomooc.com/yoyomooc/11-Publish-the-image-to--Aliyun-Docker)
 
 ### 8. [发布Docker镜像到Azure容器仓库](https://www.yoyomooc.com/yoyomooc/12-Publish-the-image-to--Azure-Docker)
+
+### 9. Docker中的数据卷(Volume)和网络(NetWork)介绍
+
+* Docker数据卷的重要性
+
+  使用容器的主要好处之一是它们很容易创造和摧毁，但当销毁容器时，其文件系统中的文件也会被删除，如果把数据文件一并删除了，那将是灾难级的，因为它们将永远丢失。所以Docker提供了**卷**的功能来管理应用程序数据。
+
+* 验证Docker卷的存在
+
+  通过实践来验证卷的存在是最好的方式， 我们在`YoYoMooc.ExampleApp`根目录中创建一个名为`Dockerfile.volumes`的文件。 添加以下代码:
+
+```dockerfile
+FROM alpine:3.9
+
+WORKDIR /data
+
+ENTRYPOINT (test -e message.txt && echo "文件已存在" \
+    || (echo "创建文件中..." \
+    && echo 你好, Docker 时间： $(date '+%X') > message.txt)) && cat message.txt
+```
+
+* 在`YoYoMooc.ExampleApp`根目录下，运行如下命令
+
+```bash
+docker build . -t yoyomooc/vtest -f Dockerfile.volumes
+docker run --name vtest yoyomooc/vtest
+```
+
+* 执行后，可以会看到如下结果
+
+```bash
+创建文件中...
+你好, Docker 时间: 05:38:35
+```
+
+​		以上信息是容器创建后，继续创建`message.txt`文件，然后读取`data/message.txt`的中的数据，然后显示出来。
+
+​		因为我没有为这个数据文件指定卷，所以它成为了容器内系统文件的一部分。而容器的文件系统是持久化的。
+
+* 我们可以通过命令来进行验证：
+
+```bash
+docker start -a vtest
+```
+
+​		可以看到输出的消息提示为`/data/message.txt`已经存在，并且时间戳都是相同的。
+
+* 现在删除容器，重新创建并启动一个新的容器
+
+```bash
+docker run --name vtest apress/vtest
+```
+
+* 得到的输出内容为：
+
+```bash
+创建文件中...
+你好, Docker 时间: 05:58:00
+```
+
+  Docker 会删除容器，同时 `/data/message.txt` 文件也会被删除。 所以容器删除后，数据文件也就丢失了。而在实际生产环境中，删除数据文件会造成严重的后果，所以需要避免。
 

@@ -1,0 +1,7 @@
+FROM alpine:3.9
+
+WORKDIR /data
+
+ENTRYPOINT (test -e message.txt && echo "文件已存在" \
+  || (echo "创建文件中..." \
+  && echo 你好, Docker 时间： $(date '+%X') > message.txt)) && cat message.txt
