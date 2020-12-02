@@ -494,3 +494,309 @@ docker inspect yoyomooc/vtest
  },
 ```
 
+### 11. 为`ASP.NET Core RazorPage` 使用`EF Core` 连接`MySQL`数据库
+
+* 拉取并检查数据库镜像
+
+```bash
+docker pull mysql:8.0
+
+docker inspect mysql:8.0
+```
+
+* 通过检查返回的信息
+
+```bash
+ "Volumes": {
+     "/var/lib/mysql": {}
+ },
+```
+
+这是告知我们，`mysql:8.0`的镜像可以将目录`/var/lib/mysql`作为数据卷，这个卷就是`MySQL`存储数据文件的地方。
+
+* 创建一个数据库容器及Docker卷
+
+```bash
+docker volume create --name productdata
+```
+
+* 创建一个`MySQL`容器，关联到我们创建的卷上
+
+```bash
+docker run -d --name asp-mysql8 -v productdata:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456 -e bind-address=0.0.0.0  mysql:8.0.0
+```
+
+* 为`RazorPage`项目添加`MySQL`支持
+
+```xml
+  <ItemGroup>   
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="3.1.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+     <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="3.1.1" />
+  </ItemGroup>
+```
+
+* 创建一个连接数据库的仓储类
+
+```c#
+using Microsoft.EntityFrameworkCore;
+
+namespace YoYoMooc.ExampleApp.Models
+{
+  public class ProductDbContext : DbContext
+  {
+    public ProductDbContext(DbContextOptions<ProductDbContext> options)
+    : base(options)
+    {
+    }
+
+    public DbSet<Product> Products { get; set; }
+  }
+}
+```
+
+```c#
+using System.Linq;
+
+namespace YoYoMooc.ExampleApp.Models
+{
+  public class DataProductRepository : IProductRepository
+  {
+    private ProductDbContext context;
+
+    public DataProductRepository(ProductDbContext ctx)
+    {
+      context = ctx;
+    }
+
+    public IQueryable<Product> Products => context.Products;
+  }
+}
+```
+
+```c#
+using System.Linq;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace YoYoMooc.ExampleApp.Models
+{
+  /// <summary>
+  /// 种子数据
+  /// </summary>
+  public static class SeedData
+  {
+    /// <summary>
+    /// 初始化数据库和种子数据
+    /// </summary>
+    /// <param name="dbcontext"></param>
+    public static IApplicationBuilder UseDataInitializer(this IApplicationBuilder builder)
+    {
+      using (var scope = builder.ApplicationServices.CreateScope())
+      {
+        var dbcontext = scope.ServiceProvider.GetService<ProductDbContext>();
+        System.Console.WriteLine("开始执行迁移数据库...");
+        dbcontext.Database.Migrate();
+        System.Console.WriteLine("数据库迁移完成...");
+        if (!dbcontext.Products.Any())
+        {
+          System.Console.WriteLine("开始创建种子数据中...");
+          dbcontext.Products.AddRange(
+          new Product("空调", "家用电器", 2750),
+          new Product("电视机", "家用电器", 2448.95m),
+          new Product("洗衣机 ", "家用电器", 1449.50m),
+          new Product("油烟机 ", "家用电器", 3454.95m),
+          new Product("冰箱", "家用电器", 9500),
+          new Product("猪肉 ", "食品", 36),
+          new Product("牛肉 ", "食品", 49.95m),
+          new Product("鸡肉 ", "食品", 22),
+          new Product("鸭肉", "食品", 18)
+          );
+          dbcontext.SaveChanges();
+        }
+        else
+        {
+          System.Console.WriteLine("无需创建种子数据...");
+        }
+      }
+      return builder;
+    }
+  }
+
+}
+```
+
+* 配置服务和种子数据
+
+```c#
+    public void ConfigureServices(IServiceCollection services)
+    {
+      // services.AddTransient<IProductRepository, MockProductRepository>();
+      services.AddTransient<IProductRepository, DataProductRepository>();
+      services.AddRazorPages();
+
+      var host = Configuration["DBHOST"] ?? "localhost";
+      var port = Configuration["DBPORT"] ?? "3306";
+      var password = Configuration["DBPASSWORD"] ?? "123456";
+
+
+      var connectionStr = $"server={host};userid=root;pwd={password};"
+      + $"port={port};database=products";
+
+      services.AddDbContextPool<ProductDbContext>(options => options.UseMySql(connectionStr));
+
+    }
+```
+
+```c#
+	public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+    { 
+        ...
+		app.UseDataInitializer();
+    }
+```
+
+* 创建数据迁移
+
+```bash
+// 从 net core 3.0 起，EF Core 命令列工具 (dotnet ef) 不在 .NET Core SDK 里面，需另装。命令如下：
+dotnet tool install --global dotnet-ef
+
+dotnet ef migrations add Initial
+
+// 使用Visual Studio包管理器控制台
+Add-migration Initial
+```
+
+* 如果你想手动生成数据库
+
+```bash
+dotnet ef database update
+
+// 使用Visual Studio包管理器控制台
+Update-Database
+```
+
+注意：目前我们没有映射端口到的宿主主机，所以无法访问。如果要本地访问请执行以下命令
+
+```bash
+docker run -d -p 3253:3306 --name asp-mysql8 -v productdata:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456  -e bind-address=0.0.0.0 mysql:8.0
+```
+
+* 修改视图内容
+
+```c#
+        /// <summary>
+        /// 服务器的名称
+        /// </summary>
+        public string Hostname { get; set; }
+        public string DBHOST { get; set; }
+        public string DBPORT { get; set; }
+        public string DBPASSWORD { get; set; }
+
+		public void OnGet()
+        {
+            Message = _config["MESSAGE"] ?? "深入浅出 ASP.NET Core 与Docker";
+
+            Products = _repository.Products.ToList();
+
+
+            Hostname = _config["HOSTNAME"];
+            DBHOST = _config["DBHOST"] ?? "localhost";
+            DBPORT = _config["DBPORT"] ?? "3306";
+            DBPASSWORD = _config["DBPASSWORD"] ?? "bb123456";
+        }
+```
+
+```c#
+<div class="text-center">
+  <div class="m-1 p-1">
+    <h3 class="display-4">欢迎</h3>
+    <p>创建年轻人的 <a href="https://www.yoyomooc.com">第一个 ASP.NET Core项目</a>.</p>
+    <h4 class="bg-success text-xs-center p-1 text-white"> @Model.Message</h4>
+    <h4 class="bg-success text-xs-center p-1 text-white">服务器Id: @Model.Hostname</h4>
+    <h1 class="bg-primary text-xs-center p-1 text-white">@Model.DBHOST:@Model.DBPORT</h1>
+    <table class="table table-sm table-striped">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>名称</th>
+          <th>分类</th>
+          <th>价格</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach (var p in Model.Products)
+        {
+          <tr>
+            <td>@p.ProductID</td>
+            <td>@p.Name</td>
+            <td>@p.Category</td>
+            <td>￥@p.Price.ToString("F2")</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>
+```
+
+* 重新创建应用镜像
+
+```bash
+dotnet publish --framework netcoreapp3.1 --configuration Release --output dist
+
+docker build . -t yoyomooc/exampleapp -f Dockerfile
+```
+
+* 检查Docker分配给`MySQL`容器的`IP`地址
+
+```c#
+docker network inspect bridge
+```
+
+```bash
+"Containers": {
+    "5aea9ac5557d172117ed56baba66fd070acc9421198344dfda0becae00f5ebb0": {
+    "Name": "asp-mysql8",
+    "EndpointID": "a01a73de5b19359ed7a0043667305fbfe3277678bef588807ed0b5fb51608503",
+    "MacAddress": "02:42:ac:11:00:02",
+    "IPv4Address": "172.17.0.2/16",
+    "IPv6Address": ""
+    },
+}
+```
+
+* 创建和启动容器，并监视它的输出
+
+```bash
+docker run -d --name productapp -p 3000:80 -e DBHOST=172.17.0.2 -e DBPASSWORD=123456 yoyomooc/exampleapp
+
+docker logs -f productapp
+```
+
+```bash
+warn: Microsoft.AspNetCore.DataProtection.Repositories.FileSystemXmlRepository[60]
+      Storing keys in a directory '/root/.aspnet/DataProtection-Keys' that may not be persisted outside of the container. Protected data will be unavailable when container is destroyed.
+warn: Microsoft.AspNetCore.DataProtection.KeyManagement.XmlKeyManager[35]
+      No XML encryptor configured. Key {4d902682-d44c-47d0-aad9-18f1547803d0} may be persisted to storage in unencrypted form.
+开始执行迁移数据库...
+数据库迁移完成...
+开始创建种子数据中...
+启动 ASP.NET Core 深入浅出Docker...
+info: Microsoft.Hosting.Lifetime[0]
+      Now listening on: http://[::]:80
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: /app
+warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
+      Failed to determine the https port for redirect.
+```
+
+* 请打开浏览器请求URL:  http://localhost:3000

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -24,8 +25,20 @@ namespace YoYoMooc.ExampleApp
     // This method gets called by the runtime. Use this method to add services to the container.
     public void ConfigureServices(IServiceCollection services)
     {
-      services.AddTransient<IProductRepository, MockProductRepository>();
+      // services.AddTransient<IProductRepository, MockProductRepository>();
+      services.AddTransient<IProductRepository, DataProductRepository>();
       services.AddRazorPages();
+
+      var host = Configuration["DBHOST"] ?? "localhost";
+      var port = Configuration["DBPORT"] ?? "3306";
+      var password = Configuration["DBPASSWORD"] ?? "123456";
+
+
+      var connectionStr = $"server={host};userid=root;pwd={password};"
+      + $"port={port};database=products";
+
+      services.AddDbContextPool<ProductDbContext>(options => options.UseMySql(connectionStr));
+
     }
 
     // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -53,6 +66,8 @@ namespace YoYoMooc.ExampleApp
       {
         endpoints.MapRazorPages();
       });
+
+      app.UseDataInitializer();
     }
   }
 }
