@@ -800,3 +800,12 @@ warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
 ```
 
 * 请打开浏览器请求URL:  http://localhost:3000
+
+### 12.  Docker中的虚拟网络是如何工作的
+
+![image-20201203090815980](https://gitee.com/zhujinrun/image/raw/master/qing/2020/image-20201203090815980.png)
+
+**核心问题**：
+
+​		当我们的`MySQL`容器重启或重新创建时，它的`IP`地址很有可能会发生变化，这就导致和我们`MySQL`容器相关联的其他正在运行的容器崩溃。我们能不能以不直接指定`IP`地址的方式来进行工作，而是通过指定其他的一种形式来完成与`MySQL` 容器的关联及相关动作。
+
