@@ -894,3 +894,73 @@ docker run -d --name loadbalancer --network frontend -v "$(pwd)/haproxy.cfg:/usr
 **5个容器之间的相互调用流程**
 
 ![image-20201203102018905](https://gitee.com/zhujinrun/image/raw/master/qing/2020/image-20201203102018905.png)
+
+### 14. Docker-compose
+
+* `docker-compose.mysql.yml`
+
+```yml
+version: "3.8"
+
+volumes: 
+  productdata
+
+networks: 
+  frontend:
+  backend:
+
+services: 
+  mysql:
+    image: "mysql:8.0.0"
+    volumes: 
+      - productdata:/var/lib/mysql
+    networks: 
+      - backend
+    environment: 
+      - MYSQL_ROOT_PASSWORD=123456
+      - bind-address=0.0.0.0
+
+dbinit:
+  image: "registry.cn-hangzhou.aliyuncs.com/yoyosoft/exampleapp:mysql"
+  networks: 
+    - backend
+  environment: 
+    - INITDB=true
+    - DBHOST=mysql
+  depends_on: 
+    - mysql
+  
+mvc:
+  image: "registry.cn-hangzhou.aliyuncs.com/yoyosoft/exampleapp:mysql"
+  networks: 
+    - backend
+    - frontend
+  environment: 
+    - DBHOST=mysql
+  depends_on: 
+    - mysql 
+loadbalancer:
+  image: "dockercloud/haproxy:1.2.1"
+  ports: 
+    - 3000:80
+  links: 
+    - mvc
+  volumes: 
+    - /var/run/docker.sock:/var/run/dock.sock
+  networks: 
+    - frontend
+
+```
+
+* 运行 docker-compose 文件
+
+```bash
+docker-compose -f docker-compose.mysql.yml up
+```
+
+* 快速创建4个mvc容器
+
+```bash
+docker-compose -f docker-compose.mysql.yml scale mvc=4
+```
+
