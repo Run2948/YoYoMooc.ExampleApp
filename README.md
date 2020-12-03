@@ -809,3 +809,88 @@ warn: Microsoft.AspNetCore.HttpsPolicy.HttpsRedirectionMiddleware[3]
 
 ​		当我们的`MySQL`容器重启或重新创建时，它的`IP`地址很有可能会发生变化，这就导致和我们`MySQL`容器相关联的其他正在运行的容器崩溃。我们能不能以不直接指定`IP`地址的方式来进行工作，而是通过指定其他的一种形式来完成与`MySQL` 容器的关联及相关动作。
 
+### 13. 在Docker中创建自定义虚拟网路
+
+* 创建自定义网络命令：
+
+```bash
+// frontend网络用于接收来自MVC容器的Http请求
+docker network create frontend
+
+// backend网络将被用于在MVC容器和MySQL容器之间进行数据查询
+docker network create backend
+
+// 查询创建的自定义网络
+docker network ls
+```
+
+* 将容器连接到自定义网络
+  * 创建一个新的数据库容器，然后将它链接到后端网络中
+
+```bash
+docker run -d --name mysql -v productdata:/var/lib/mysql --network backend -e MYSQL_ROOT_PASSWORD=123456 -e bind-address=0.0.0.0 mysql:latest
+```
+  * 创建创建多个`MVC`应用程序
+
+```bash
+docker create --name productapp1 -e DBHOST=mysql -e MESSAGE="第1台服务器" --network backend yoyomooc/exampleapp
+
+docker create --name productapp2 -e DBHOST=mysql -e MESSAGE="第2台服务器" --network backend yoyomooc/exampleapp
+
+docker create --name productapp3 -e DBHOST=mysql -e MESSAGE="第3台服务器" --network backend yoyomooc/exampleapp
+```
+
+`docker run`和`docker create`命令只能将容器连接到一个网络。当前的命令中我们指定容器链接了`backend`网络。但是我们同时也需要将`mvc`容器连接到前端网络`frontend`中。
+
+* 容器继续连接网络命令如下:
+
+```bash
+docker network connect frontend productapp1
+
+docker network connect frontend productapp2
+
+docker network connect frontend productapp3
+```
+
+* 现在我们启动这些容器
+
+```bash
+docker start productapp1 productapp2 productapp3
+```
+
+当前我们的`MVC` 容器被创建了，但是都没有映射端口，这意味着它们只能通过Docker的虚拟网络进行访问，我们无法通过主机的操作系统访问。
+
+* 使用 `haproxy` 实现多个Docker容器组网实现负载均衡
+
+  * 添加 `haproxy` 配置文件 `haproxy.cfg` 
+
+```bash
+defaults
+    timeout connect 5000
+    timeout client 50000
+    timeout server 50000
+
+frontend localnodes
+    bind *:80
+    mode http
+    default_backend mvc
+
+backend mvc
+    mode http
+    balance roundrobin
+    server mvc1 produuctapp1:80
+    server mvc2 produuctapp2:80
+    server mvc3 produuctapp3:80
+```
+
+* 创建负载均衡容器
+
+```bash
+docker run -d --name loadbalancer --network frontend -v "$(pwd)/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg" -p 3000:80 haproxy:1.7.0
+```
+
+创建成功后，我们就可以在浏览器中输入:  http://localhost:3000 进行访问。
+
+**5个容器之间的相互调用流程**
+
+![image-20201203102018905](https://gitee.com/zhujinrun/image/raw/master/qing/2020/image-20201203102018905.png)
